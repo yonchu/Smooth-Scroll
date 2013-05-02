@@ -10,12 +10,16 @@
 " context don't allow my eyes to follow the action properly.
 "
 " Global variables:
-"   g:smooth_scroll_latency
-"     Change ths scroll speed.
-"     (default: 50000)
+"   g:smooth_scroll_du_sleep_time_msec
+"     This valus is to change the scroll speed for <C-D> and <C-U>.
+"     (default: 10 msec)
 "
-"   g:scroll_skip_line_size
-"     Skip redraw the display.
+"   g:smooth_scroll_fb_sleep_time_msec
+"     This valus is to change the scroll speed for <C-F> and <C-B>.
+"     (default: 5 msec)
+"
+"   g:smooth_scroll_skip_redraw_line_size
+"     This value is to skip redraw the display.
 "     (default: 0)
 "
 "   g:smooth_scroll_no_default_key_mappings
@@ -34,10 +38,11 @@ let s:save_cpo = &cpo
 set cpo&vim
 
 
-let g:smooth_scroll_latency = get(g:, 'smooth_scroll_latency', 5000)
-let g:scroll_skip_line_size = get(g:, 'scroll_skip_line_size', 0)
+let g:smooth_scroll_du_sleep_time_msec = get(g:, 'smooth_scroll_du_sleep_time_msec', 10)
+let g:smooth_scroll_fb_sleep_time_msec = get(g:, 'smooth_scroll_fb_sleep_time_msec', 5)
+let g:smooth_scroll_skip_redraw_line_size = get(g:, 'smooth_scroll_skip_redraw_line_size', 0)
 
-function! SmoothScroll(dir, windiv, scale)
+function! SmoothScroll(cmd, windiv, sleep_time_msec)
   " Disable highlight the screen line of the cursor,
   " because will make screen redrawing slower.
   let save_cul = &cul
@@ -45,34 +50,35 @@ function! SmoothScroll(dir, windiv, scale)
     set nocul
   endif
 
-  let scrdown = a:dir == 'd'
   let wlcount = winheight(0) / a:windiv
-  let latency = (g:smooth_scroll_latency * a:scale) / 1000
 
-  if scrdown
-    let pos = 'j'.(line('.') != line('w$') ? "\<C-E>" : '')
-    let vbl = 'w$'
+  let cmd = 'normal! '.a:cmd
+  if a:cmd == 'j'
+    " Scroll down.
     let tob = line('$')
+    let vbl = 'w$'
+    let cmd = cmd."\<C-E>"
   else
-    let pos = 'k'.(line('.') != line('w0') ? "\<C-Y>" : '')
-    let vbl = 'w0'
+    " Scroll up.
     let tob = 1
+    let vbl = 'w0'
+    let cmd = cmd."\<C-Y>"
   endif
-  let cmd = 'normal! '.pos
-  let slp = 'sleep '.latency.'m'
+
+  let slp = 'sleep '.a:sleep_time_msec.'m'
 
   let i = 0
   let j = 0
   while i < wlcount
     let i += 1
     if line(vbl) == tob
-      execute 'normal '.(wlcount - i).pos
+      execute 'normal! '.(wlcount - i).a:cmd
       break
     endif
 
     execute cmd
 
-    if j >= g:scroll_skip_line_size
+    if j >= g:smooth_scroll_skip_redraw_line_size
       let j = 0
       redraw
     else
@@ -87,11 +93,15 @@ endfunction
 
 
 " Interfaces.
-nnoremap <silent> <script> <Plug>smooth-scroll-c-d :call SmoothScroll('d', 2, 2)<cr>
-nnoremap <silent> <script> <Plug>smooth-scroll-c-u :call SmoothScroll('u', 2, 2)<cr>
+nnoremap <silent> <script> <Plug>smooth-scroll-c-d
+      \ :call SmoothScroll('j', 2, g:smooth_scroll_du_sleep_time_msec)<cr>
+nnoremap <silent> <script> <Plug>smooth-scroll-c-u
+      \ :call SmoothScroll('k', 2, g:smooth_scroll_du_sleep_time_msec)<cr>
 
-nnoremap <silent> <script> <Plug>smooth-scroll-c-f :call SmoothScroll('d', 1, 1)<cr>
-nnoremap <silent> <script> <Plug>smooth-scroll-c-b :call SmoothScroll('u', 1, 1)<cr>
+nnoremap <silent> <script> <Plug>smooth-scroll-c-f
+      \ :call SmoothScroll('j', 1, g:smooth_scroll_fb_sleep_time_msec)<cr>
+nnoremap <silent> <script> <Plug>smooth-scroll-c-b
+      \ :call SmoothScroll('k', 1, g:smooth_scroll_fb_sleep_time_msec)<cr>
 
 " Default mappings.
 if !get(g:, 'g:smooth_scroll_no_default_key_mappings', 0)
